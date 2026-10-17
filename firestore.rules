@@ -1,19 +1,45 @@
 rules_version = '2';
 service cloud.firestore {
  match /databases/{database}/documents {
+  function signedIn() { return request.auth != null; }
+  function owner(room) {
+   return signedIn() && get(/databases/$(database)/documents/rooms/$(room)).data.owner == request.auth.uid;
+  }
+  function member(room) {
+   return signedIn() && (owner(room) || exists(/databases/$(database)/documents/rooms/$(room)/teams/$(request.auth.uid)));
+  }
   match /rooms/{room} {
-   allow create: if request.auth != null && request.resource.data.owner == request.auth.uid;
-   allow read: if request.auth != null;
-   allow update, delete: if request.auth != null && resource.data.owner == request.auth.uid;
+   allow create: if signedIn() && request.resource.data.owner == request.auth.uid
+    && request.resource.data.code == room && request.resource.data.stage == 0
+    && request.resource.data.phase == 'lobby';
+   allow get: if signedIn();
+   allow list: if false;
+   allow update: if owner(room) && request.resource.data.owner == resource.data.owner
+    && request.resource.data.code == resource.data.code
+    && request.resource.data.stage is int && request.resource.data.stage >= 0 && request.resource.data.stage <= 2
+    && request.resource.data.phase in ['lobby', 'open', 'closed', 'summary', 'finished'];
    match /teams/{team} {
-    allow read: if request.auth != null;
-    allow create: if request.auth != null && team == request.auth.uid && request.resource.data.score == 0;
-    allow update: if request.auth != null && get(/databases/$(database)/documents/rooms/$(room)).data.owner == request.auth.uid;
+    allow get: if signedIn() && (team == request.auth.uid || member(room));
+    allow list: if member(room);
+    allow create: if signedIn() && team == request.auth.uid
+     && exists(/databases/$(database)/documents/rooms/$(room))
+     && request.resource.data.keys().hasOnly(['name', 'score', 'joined'])
+     && request.resource.data.name is string && request.resource.data.name.size() > 0
+     && request.resource.data.name.size() <= 80 && request.resource.data.score == 0;
+    allow update: if owner(room) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['score'])
+     && request.resource.data.score is number && request.resource.data.score >= 0;
    }
    match /submissions/{submission} {
-    allow read: if request.auth != null;
-    allow create: if request.auth != null && request.resource.data.teamId == request.auth.uid && submission.matches(request.auth.uid + '_[0-2]') && get(/databases/$(database)/documents/rooms/$(room)).data.phase == 'open' && request.resource.data.stage == get(/databases/$(database)/documents/rooms/$(room)).data.stage;
-    allow update, delete: if false;
+    allow read: if member(room);
+    allow create: if member(room)
+     && request.resource.data.keys().hasOnly(['teamId', 'stage', 'option', 'reason', 'submitted'])
+     && request.resource.data.teamId == request.auth.uid
+     && submission.matches(request.auth.uid + '_[0-2]')
+     && request.resource.data.stage == get(/databases/$(database)/documents/rooms/$(room)).data.stage
+     && get(/databases/$(database)/documents/rooms/$(room)).data.phase == 'open'
+     && request.resource.data.option is int && request.resource.data.option >= 0 && request.resource.data.option <= 2
+     && request.resource.data.reason is string && request.resource.data.reason.size() >= 12
+     && request.resource.data.reason.size() <= 1200;
    }
   }
  }
