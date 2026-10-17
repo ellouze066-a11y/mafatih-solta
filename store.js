@@ -1,4 +1,4 @@
-import {firebaseConfig} from './cloud-config.js';
+import {firebaseConfig} from './cloud-config.js?v=cloud2';
 const key='civic_game_v4';export const cloud=!!firebaseConfig;
 let fb=null,uid=null;
 async function sdk(){if(fb)return fb;const [app,auth,fs]=await Promise.all([import('https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js'),import('https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js'),import('https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js')]);const instance=app.initializeApp(firebaseConfig);const a=auth.getAuth(instance);await auth.setPersistence(a,auth.browserSessionPersistence);await auth.signInAnonymously(a);uid=a.currentUser.uid;fb={fs,db:fs.getFirestore(instance)};return fb}

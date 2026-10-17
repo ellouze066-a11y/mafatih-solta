@@ -1,4 +1,4 @@
-import {stages} from './data.js';import {cloud,createRoom,watch,changeRoom,setScore} from './store.js';
+import {stages} from './data.js';import {cloud,createRoom,watch,changeRoom,setScore} from './store.js?v=cloud2';
 const $=x=>document.getElementById(x);let code='',state=null,stop=null;const phases={lobby:'انتظار الفرق',open:'استقبال الإجابات',closed:'مناقشة الأعمال',summary:'أدوّن في كراسي حصيلة نشاطي',finished:'انتهت اللعبة'};
 function say(text){if(!('speechSynthesis'in window))return alert('القراءة الصوتية غير مدعومة في هذا المتصفح');speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(text);u.lang='ar-SA';u.rate=.85;speechSynthesis.speak(u)}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}

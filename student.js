@@ -1,4 +1,4 @@
-import {stages} from './data.js';import {join,watch,sendAnswer,cloud,id} from './store.js';const $=x=>document.getElementById(x);let code='',teamId='',state=null,choice=-1,lastStage=-1;
+import {stages} from './data.js';import {join,watch,sendAnswer,cloud,id} from './store.js?v=cloud2';const $=x=>document.getElementById(x);let code='',teamId='',state=null,choice=-1,lastStage=-1;
 $('code').value=new URLSearchParams(location.search).get('room')||'';
 function say(text){if(!('speechSynthesis'in window))return alert('المتصفح لا يدعم القراءة الصوتية');speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(text);u.lang='ar-SA';u.rate=.85;speechSynthesis.speak(u)}
 $('enter').onclick=async()=>{code=$('code').value.trim().toUpperCase();let name=$('name').value.trim();if(!code||!name)return alert('أدخل رمز الغرفة واسم الفريق');try{teamId=await join(code,name);$('join').classList.add('hide');$('play').classList.remove('hide');watch(code,x=>{if(x){state=x;render()}})}catch(e){$('error').textContent=e.message;$('error').classList.remove('hide')}};
