@@ -20,5 +20,22 @@ export async function readRoom(code){if(cloud){const {fs,db}=await sdk();const s
 export async function changeRoom(code,patch){if(cloud){const {fs,db}=await sdk();await fs.updateDoc(fs.doc(db,'rooms',code),{...patch,updated:Date.now()})}else{const x=await readRoom(code);if(!x)throw Error('الغرفة غير موجودة');localStorage.setItem(key,JSON.stringify({...x,...patch,updated:Date.now()}));window.dispatchEvent(new Event('storage'))}}
 export async function join(code,name){const x=await readRoom(code);if(!x)throw Error('رمز غير صحيح');if(cloud){const {fs,db}=await sdk();const ref=fs.doc(db,'rooms',code,'teams',uid);const existing=await fs.getDoc(ref);if(!existing.exists())await fs.setDoc(ref,{name,score:0,joined:Date.now()});return uid}const tid='team_'+name.trim();x.teams[tid]??={name,score:0,joined:Date.now()};await changeRoom(code,{teams:x.teams});return tid}
 export async function sendAnswer(code,teamId,stage,option,reason){const room=await readRoom(code);if(!room||room.phase!=='open'||room.stage!==stage)throw Error('انتهى استقبال الإجابات لهذا التحدّي');if(cloud){const {fs,db}=await sdk();await fs.setDoc(fs.doc(db,'rooms',code,'submissions',teamId+'_'+stage),{teamId,stage,option,reason,submitted:Date.now()})}else{const x=await readRoom(code);x.submissions[teamId+'_'+stage]={teamId,stage,option,reason,submitted:Date.now()};await changeRoom(code,{submissions:x.submissions})}}
-export async function setScore(code,teamId,score){if(cloud){const {fs,db}=await sdk();await fs.updateDoc(fs.doc(db,'rooms',code,'teams',teamId),{score})}else{const x=await readRoom(code);x.teams[teamId].score=score;await changeRoom(code,{teams:x.teams})}}
+export async function adjustScore(code,teamId,delta){
+ if(cloud){
+  const {fs,db}=await sdk();
+  const ref=fs.doc(db,'rooms',code,'teams',teamId);
+  await fs.runTransaction(db,async transaction=>{
+   const team=await transaction.get(ref);
+   if(!team.exists())throw Error('الفريق غير موجود');
+   transaction.update(ref,{score:Math.max(0,(team.data().score||0)+delta)});
+  });
+ }else{
+  const room=JSON.parse(localStorage.getItem(key)||'null');
+  const team=room?.code===code?room.teams[teamId]:null;
+  if(!team)throw Error('الفريق غير موجود');
+  team.score=Math.max(0,(team.score||0)+delta);
+  room.updated=Date.now();
+  localStorage.setItem(key,JSON.stringify(room));
+ }
+}
 export function watch(code,callback,onError=console.error){if(cloud){let stops=[],state=null,teams={},subs={},cancelled=false;sdk().then(({fs,db})=>{if(cancelled)return;const emit=()=>{if(state)callback({...state,teams,submissions:subs})};stops=[fs.onSnapshot(fs.doc(db,'rooms',code),s=>{state=s.exists()?s.data():null;if(!state)onError(Error('الحصة غير موجودة. أنشئ حصة جديدة.'));emit()},onError),fs.onSnapshot(fs.collection(db,'rooms',code,'teams'),s=>{teams=Object.fromEntries(s.docs.map(d=>[d.id,d.data()]));emit()},onError),fs.onSnapshot(fs.collection(db,'rooms',code,'submissions'),s=>{subs=Object.fromEntries(s.docs.map(d=>[d.id,d.data()]));emit()},onError)]}).catch(onError);return()=>{cancelled=true;stops.forEach(fn=>fn())}}let running=true;const poll=async()=>{if(running)callback(await readRoom(code))};poll();const timer=setInterval(poll,1200);return()=>{running=false;clearInterval(timer)}}
